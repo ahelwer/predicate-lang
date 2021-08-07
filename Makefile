@@ -16,9 +16,9 @@ gorun:
 build: src/lib.rs
 	cargo build --target=wasm32-unknown-unknown
 
-.PHONY: predicate
+.PHONY: predicate-bin
 predicate:
-	cargo build --bin predicate
+	cargo build --bin predicate-bin
 
 .PHONY: clean
 clean:

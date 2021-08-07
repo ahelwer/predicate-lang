@@ -4,9 +4,11 @@ version = "0.1.0"
 authors = ["Alexander Klizhentas <klizhentas@gmail.com>"]
 edition = "2018"
 
-# [[bin]]
-# name = "predicate"
-# path = "src/predicate/main.rs"
+[workspace]
+
+[[bin]]
+name = "predicate-bin"
+path = "cmd/predicate/main.rs"
 
 [lib]
 crate-type =["cdylib"]

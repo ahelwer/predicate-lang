@@ -1,19 +1,3 @@
-// Wasmer will let you easily run Wasm module in a Rust host.
-//
-// This example illustrates the basics of using Wasmer through a "Hello World"-like project:
-//
-//   1. How to load a Wasm modules as bytes
-//   2. How to compile the module
-//   3. How to create an instance of the module
-//
-// You can run the example directly by executing in Wasmer root:
-//
-// ```shell
-// go test examples/example_instance_test.go
-// ```
-//
-// Ready?
-
 package main
 
 import (
@@ -25,7 +9,7 @@ import (
 	"github.com/wasmerio/wasmer-go/wasmer"
 )
 
-func ExampleInstance() {
+func main() {
 	wasmBytes, err := ioutil.ReadFile("target/wasm32-unknown-unknown/debug/predicate.wasm")
 	if err != nil {
 		panic(err)
@@ -174,7 +158,6 @@ func writeMessage(w wasm, msg m) (interface{}, int) {
 	data := marshalMessage(msg)
 
 	ptrVal, err := w.alloc(len(data))
-	//	fmt.Printf("allocated: %v for data(%v) %#v\n", ptrVal, len(data), data)
 	if err != nil {
 		panic(err)
 	}
@@ -191,8 +174,4 @@ func writeMessage(w wasm, msg m) (interface{}, int) {
 	}
 
 	return ptrVal, len(data)
-}
-
-func main() {
-	ExampleInstance()
 }
