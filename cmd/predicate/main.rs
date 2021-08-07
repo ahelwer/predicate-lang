@@ -2,24 +2,27 @@ use crepe::crepe;
 
 crepe! {
     @input
-    struct User(i32);
+    struct User(&'static str);
 
     @input
-    struct HasRole(i32, i32);
+    struct HasRole(&'static str, &'static str);
 
     @output
-    struct Allowed(i32);
+    struct Allowed(&'static str);
 
-    Allowed(u) <- User(u), HasRole(u, 0);
+    Allowed(u) <- User(u), HasRole(u, "admin");
 }
 
 fn main() {
     let mut runtime = Crepe::new();
-    runtime.extend(&[User(1)]);
-    runtime.extend(&[HasRole(1, 0)]);
+    runtime.extend(&[User("Alice"), User("Bob")]);
+    runtime.extend(&[HasRole("Alice", "admin"), HasRole("Bob", "users")]);
 
     let (allowed,) = runtime.run();
+    println!("Found {} output relationships", allowed.len());
+    println!("Found output relationships for Alice: {}", allowed.get(&Allowed("Alice")).is_some());
+    println!("Found output relationships for Bob: {}", allowed.get(&Allowed("Bob")).is_some());
     for Allowed(x) in allowed {
-        println!("User {} is allowed", x);
+        println!("User {} is in allowed set", x);
     }
 }
