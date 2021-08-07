@@ -7,7 +7,7 @@ use protobuf::Message;
 use std::mem;
 use std::os::raw::c_void;
 
-thread_local!(static DASHMAP: DashMap<i32, usize> = DashMap::new());
+thread_local!(static ALLOCMAP: DashMap<i32, usize> = DashMap::new());
 
 
 #[no_mangle]
@@ -21,7 +21,7 @@ pub extern "C" fn alloc(size: usize) -> i32 {
     let mut buf = Vec::<u8>::with_capacity(size);
     let ptr = buf.as_mut_ptr() as *mut c_void as i32;
 
-    DASHMAP.with(|map| {
+    ALLOCMAP.with(|map| {
         map.insert(ptr, size);
     });
     mem::forget(buf);
@@ -31,7 +31,7 @@ pub extern "C" fn alloc(size: usize) -> i32 {
 #[no_mangle]
 pub extern "C" fn get_alloc_size(ptr: i32) -> i32 {
     let mut result:i32 = 0;
-    DASHMAP.with(|map| {
+    ALLOCMAP.with(|map| {
         result = *map.get(&(ptr)).unwrap() as i32
     });
     return result;
@@ -39,7 +39,7 @@ pub extern "C" fn get_alloc_size(ptr: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn dealloc(ptr: i32) {
-    DASHMAP.with(|map| {
+    ALLOCMAP.with(|map| {
         map.remove(&ptr);
     });
 
@@ -80,19 +80,11 @@ pub extern "C" fn call(req: *mut c_void, req_len: u32) -> *mut c_void {
     let mut response_bytes = Message::write_to_bytes(&response).unwrap();
 
     // short circuit allocation/copy by relying on write_to_bytes usage of Vec to allocate buffer
-    DASHMAP.with(|map| {
+    ALLOCMAP.with(|map| {
         map.insert(response_bytes.as_mut_ptr() as i32, response_bytes.len());
     });
 
     let result = response_bytes.as_mut_ptr() as *mut c_void;
     mem::forget(response_bytes);
     return result;
-
-    // let ptr = alloc(response_bytes.len());
-
-    // //TODO this loop can skip set_at and update array directly
-    // for i in 0..response_bytes.len() {
-    //     set_at(ptr, i as i32, response_bytes[i as usize] as i32);
-    // }
-    // return ptr as *mut c_void;
 }
