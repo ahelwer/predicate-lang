@@ -39,7 +39,6 @@ func ExampleInstance() {
 	}
 
 	fmt.Println("Instantiating module...")
-	// Let's instantiate the Wasm module.
 	instance, err := wasmer.NewInstance(module, wasmer.NewImportObject())
 
 	if err != nil {
@@ -77,6 +76,8 @@ func ExampleInstance() {
 			panic(err)
 		}
 
+		w.dealloc(ptrVal)
+
 		data, err := readMessageBytes(w, rePtrVal)
 		if err != nil {
 			panic(err)
@@ -86,7 +87,7 @@ func ExampleInstance() {
 
 		var response types.Response
 		response.Unmarshal(data)
-		// fmt.Printf("Response: %#v", response)
+		// fmt.Printf("Response: %#v\n", response)
 	}
 	diff := time.Since(start)
 	fmt.Printf("%v iterations in %v, %v per iteration", iters, diff, diff/time.Duration(iters))
@@ -153,7 +154,11 @@ func marshalMessage(msg m) []byte {
 }
 
 func readMessageBytes(w wasm, ptrVal interface{}) ([]byte, error) {
-	size, _ := w.getAllocSize(ptrVal)
+	size, err := w.getAllocSize(ptrVal)
+	if err != nil {
+		panic(err)
+	}
+
 	data := make([]byte, size.(int32))
 	for i := range data {
 		b, err := w.getAt(ptrVal, i)
@@ -174,6 +179,10 @@ func writeMessage(w wasm, msg m) (interface{}, int) {
 		panic(err)
 	}
 
+	// TODO: technically the allocation is within our memory address space
+	// and this process has access direct read/write access to it (we are trying to
+	// continerize WA not main proocess), so following loop could skip setAt() calls in the
+	// loop and update the array directly (faster?)
 	for i, byte := range data {
 		_, err = w.setAt(ptrVal, i, int32(byte))
 		if err != nil {

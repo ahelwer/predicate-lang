@@ -30,20 +30,20 @@ pub extern "C" fn alloc(size: usize) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn get_alloc_size(ptr: i32) -> i32 {
-    let mut vvv:i32 = 0;
+    let mut result:i32 = 0;
     DASHMAP.with(|map| {
-        vvv = *map.get(&(ptr)).unwrap() as i32
+        result = *map.get(&(ptr)).unwrap() as i32
     });
-    return vvv;
+    return result;
 }
 
 #[no_mangle]
 pub extern "C" fn dealloc(ptr: i32) {
-    unsafe {
-        DASHMAP.with(|map| {
-            map.remove(&ptr);
-        });
+    DASHMAP.with(|map| {
+        map.remove(&ptr);
+    });
 
+    unsafe {
         let _buf = Vec::from_raw_parts(ptr as *mut u8, 0, 0);
         mem::forget(_buf);
     }
@@ -70,20 +70,29 @@ pub extern "C" fn call(req: *mut c_void, req_len: u32) -> *mut c_void {
     let req_bytes: Vec<u8> =
         unsafe { Vec::from_raw_parts(req as *mut u8, req_len as usize, req_len as usize) };
 
-    let req: Request = Message::parse_from_bytes(&req_bytes).unwrap();
+    let request: Request = Message::parse_from_bytes(&req_bytes).unwrap();
 
     // TODO: add call to the processing function
     let owned_string: String = "response to input string: ".to_owned();
-    let mut re = Response::new();
-    re.set_Message(owned_string + req.get_Message());
-    let response_size = re.compute_size();
-    let response_bytes = Message::write_to_bytes(&re).unwrap();
+    let mut response = Response::new();
+    response.set_Message(owned_string + request.get_Message());
+    
+    let mut response_bytes = Message::write_to_bytes(&response).unwrap();
 
-    let ptr = alloc(response_size as usize);
+    // short circuit allocation/copy by relying on write_to_bytes usage of Vec to allocate buffer
+    DASHMAP.with(|map| {
+        map.insert(response_bytes.as_mut_ptr() as i32, response_bytes.len());
+    });
 
-    //TODO this loop can skip set_at and update array directly
-    for i in 0..response_size {
-        set_at(ptr, i as i32, response_bytes[i as usize] as i32);
-    }
-    return ptr as *mut c_void;
+    let result = response_bytes.as_mut_ptr() as *mut c_void;
+    mem::forget(response_bytes);
+    return result;
+
+    // let ptr = alloc(response_bytes.len());
+
+    // //TODO this loop can skip set_at and update array directly
+    // for i in 0..response_bytes.len() {
+    //     set_at(ptr, i as i32, response_bytes[i as usize] as i32);
+    // }
+    // return ptr as *mut c_void;
 }
