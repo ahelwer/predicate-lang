@@ -26,47 +26,28 @@ import (
 )
 
 func ExampleInstance() {
-	// Let's declare the Wasm module.
-	//
-	// We are using the text representation of the module here.
-	wasmBytes, err := ioutil.ReadFile("target/wasm32-unknown-unknown/debug/acre.wasm")
+	wasmBytes, err := ioutil.ReadFile("target/wasm32-unknown-unknown/debug/predicate.wasm")
 	if err != nil {
 		panic(err)
 	}
 
-	// Create an Engine
-	engine := wasmer.NewEngine()
-
-	// Create a Store
-	store := wasmer.NewStore(engine)
-
 	fmt.Println("Compiling module...")
-	module, err := wasmer.NewModule(store, wasmBytes)
+	module, err := wasmer.NewModule(wasmer.NewStore(wasmer.NewEngine()), wasmBytes)
 
 	if err != nil {
 		fmt.Println("Failed to compile module:", err)
 	}
 
-	// Create an empty import object.
-	importObject := wasmer.NewImportObject()
-
 	fmt.Println("Instantiating module...")
 	// Let's instantiate the Wasm module.
-	instance, err := wasmer.NewInstance(module, importObject)
+	instance, err := wasmer.NewInstance(module, wasmer.NewImportObject())
 
 	if err != nil {
 		panic(fmt.Sprintln("Failed to instantiate the module:", err))
 	}
 
-	// We now have an instance ready to be used.
-	//
-	// From an `Instance` we can fetch any exported entities from the Wasm module.
-	// Each of these entities is covered in others examples.
-	//
-	// Here we are fetching an exported function. We won't go into details here
-	// as the main focus of this example is to show how to create an instance out
-	// of a Wasm module and have basic interactions with it.
 	add, err := instance.Exports.GetFunction("add")
+
 	if err != nil {
 		panic(fmt.Sprintln("Failed to get the `add` function:", err))
 	}
@@ -80,9 +61,47 @@ func ExampleInstance() {
 
 	fmt.Println("Results of `add`:", result)
 
+	w := createInstanceAllocator(instance)
+
+	start := time.Now()
+	iters := 13000
+	for i := 0; i < iters; i++ {
+		message := &types.Request{
+			Message: "Hello, World!",
+		}
+
+		ptrVal, len := writeMessage(w, message)
+
+		rePtrVal, err := w.call(ptrVal, len)
+		if err != nil {
+			panic(err)
+		}
+
+		data, err := readMessageBytes(w, rePtrVal)
+		if err != nil {
+			panic(err)
+		}
+
+		w.dealloc(rePtrVal)
+
+		var response types.Response
+		response.Unmarshal(data)
+		// fmt.Printf("Response: %#v", response)
+	}
+	diff := time.Since(start)
+	fmt.Printf("%v iterations in %v, %v per iteration", iters, diff, diff/time.Duration(iters))
+}
+
+func createInstanceAllocator(instance *wasmer.Instance) wasm {
 	w := wasm{}
+	var err error
 
 	w.alloc, err = instance.Exports.GetFunction("alloc")
+	if err != nil {
+		panic(err)
+	}
+
+	w.dealloc, err = instance.Exports.GetFunction("dealloc")
 	if err != nil {
 		panic(err)
 	}
@@ -102,107 +121,21 @@ func ExampleInstance() {
 		panic(err)
 	}
 
-	start := time.Now()
-	iters := 13000
-	for i := 0; i < iters; i++ {
-		requestResponse(w)
-	}
-	diff := time.Now().Sub(start)
-	fmt.Printf("%v iterations in %v, %v per iteration", iters, diff, diff/time.Duration(iters))
-
-	// Output:
-	// Compiling module...
-	// Instantiating module...
-	// Calling `add_one` function...
-	// Results of `add_one`: 2
-}
-
-func requestResponse(w wasm) {
-	message := &types.Request{
-		Message: "Hello, World!",
-	}
-
-	responseHeader := &types.ResponseHeader{
-		SizeBytes: 4294967295,
-		Ptr:       4294967295,
-	}
-
-	ptrVal, len := writeMessage(w, message)
-
-	rePtrVal, err := w.call(ptrVal, len)
+	w.getAllocSize, err = instance.Exports.GetFunction("get_alloc_size")
 	if err != nil {
 		panic(err)
 	}
-
-	data, err := readMessageBytes(w, rePtrVal, responseHeader.Size())
-	if err != nil {
-		panic(err)
-	}
-
-	//fmt.Printf("Data: %#v\n", data)
-
-	if err = responseHeader.Unmarshal(data); err != nil {
-		panic(err)
-	}
-
-	//	fmt.Printf("Ptr val: %v %v %v\n", ptrVal, rePtrVal, len)
-	//	fmt.Printf("Out: %v %v", responseHeader.SizeBytes, responseHeader.Ptr)
-
-	responseData, err := readMessageBytes(w, int32(responseHeader.Ptr), int(responseHeader.SizeBytes))
-	if err != nil {
-		panic(err)
-	}
-
-	var response types.Response
-	response.Unmarshal(responseData)
-	//fmt.Printf("Response: %#v", response)
-}
-
-func demo() {
-	/*
-				cap := 16
-				ptrVal, err := alloc(cap)
-				if err != nil {
-					panic(err)
-				}
-
-				_, err = setAt(ptrVal, 0, 1)
-				if err != nil {
-					panic(err)
-				}
-
-				_, err = setAt(ptrVal, 1, 2)
-				if err != nil {
-					panic(err)
-				}
-
-				b1, err := getAt(ptrVal, 0)
-				if err != nil {
-					panic(err)
-				}
-
-				b2, err := getAt(ptrVal, 1)
-				if err != nil {
-					panic(err)
-				}
-
-		fmt.Printf("%v %v", b1, b2)
-	*/
-
+	return w
 }
 
 type wasm struct {
-	alloc func(...interface{}) (interface{}, error)
-	setAt func(...interface{}) (interface{}, error)
-	getAt func(...interface{}) (interface{}, error)
-	call  func(...interface{}) (interface{}, error)
+	alloc        func(...interface{}) (interface{}, error)
+	dealloc      func(...interface{}) (interface{}, error)
+	setAt        func(...interface{}) (interface{}, error)
+	getAt        func(...interface{}) (interface{}, error)
+	getAllocSize func(...interface{}) (interface{}, error)
+	call         func(...interface{}) (interface{}, error)
 }
-
-// Int64Size is a constant for 64 bit integer byte size
-const Int64Size = 8
-
-// Int32Size is a constant for 32 bit integer byte size
-const Int32Size = 4
 
 type m interface {
 	MarshalTo(dAtA []byte) (int, error)
@@ -219,8 +152,9 @@ func marshalMessage(msg m) []byte {
 	return bytes
 }
 
-func readMessageBytes(w wasm, ptrVal interface{}, size int) ([]byte, error) {
-	data := make([]byte, size, size)
+func readMessageBytes(w wasm, ptrVal interface{}) ([]byte, error) {
+	size, _ := w.getAllocSize(ptrVal)
+	data := make([]byte, size.(int32))
 	for i := range data {
 		b, err := w.getAt(ptrVal, i)
 		if err != nil {

@@ -13,15 +13,6 @@ message Request {
     string Message = 1;
 }
 
-// ResponseHeader is the response header passed to WASM module
-// so it can fill it in with the allocated response information
-message ResponseHeader {
-    // SizeBytes is the amount of response bytes
-    fixed32 SizeBytes = 2;
-    // Ptr is a pointer to allocated response
-    fixed32 Ptr = 3;
-}
-
 message Response {
     // Message is the message to pass
     string Message = 1;

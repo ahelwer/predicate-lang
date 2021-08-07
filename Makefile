@@ -4,12 +4,16 @@ CLANG_FORMAT ?= $(shell which clang-format || which clang-format-10)
 .PHONY: all
 all: build clean gorun
 
+.PHONY: setup-dev-env
+setup-dev-env:
+	cargo install wasm-gc
+
 .PHONY: gorun
 gorun:
 	go build main.go && ./main
 
 .PHONY: build
-build:
+build: src/lib.rs
 	cargo build --target=wasm32-unknown-unknown
 
 .PHONY: predicate
@@ -18,7 +22,7 @@ predicate:
 
 .PHONY: clean
 clean:
-	wasm-gc target/wasm32-unknown-unknown/debug/acre.wasm
+	wasm-gc target/wasm32-unknown-unknown/debug/predicate.wasm
 
 # grpc generates GRPC stubs from service definitions
 .PHONY: grpc

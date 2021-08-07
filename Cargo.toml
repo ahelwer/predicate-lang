@@ -4,9 +4,9 @@ version = "0.1.0"
 authors = ["Alexander Klizhentas <klizhentas@gmail.com>"]
 edition = "2018"
 
-[[bin]]
-name = "predicate"
-path = "src/predicate/main.rs"
+# [[bin]]
+# name = "predicate"
+# path = "src/predicate/main.rs"
 
 [lib]
 crate-type =["cdylib"]
@@ -15,3 +15,7 @@ crate-type =["cdylib"]
 crepe = "0.1.5"
 sha1 = "0.6.0"
 protobuf = "2.24.1"
+lazy_static = "1.4.0"
+wasm-bindgen = "0.2.54"
+dashmap = "4.0.2"
+thread_local = "1.1"
