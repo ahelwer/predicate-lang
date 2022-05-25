@@ -53,4 +53,28 @@ which in this case will print out:
 ```
 It is easy to evaluate this expression in Racket; whenever a user requests access to a resource, the well-known variables `username` and `resource_name` are given concrete values and the expression will evaluate to either true or false.
 If true, the user is permitted to access the resource.
-These well-known variables (and various helper functions) are provided by the `teleport` python module imported above.
+These well-known variables (and various helper functions) are provided by the `teleport` python module.
+This module contains the `Entities` class defining the variables, as used above.
+
+## Roles
+
+Roles have two components: their name, and a logical expression.
+If a user possesses a role and the corresponding logical expression evaluates to true for a given access request, the user is permitted access.
+This is represented using Z3's if-then-else construct, `z3.If`:
+```py
+z3.If(
+  Entities.USER_GROUP_MEMBERSHIP(z3.StringVal(role_name)),
+  role_expr,
+  z3.BoolVal(False)
+)
+```
+The entire set of roles is combined in a large disjunction with `z3.Or` so if one or more of the `z3.If` statements evaluates to true then the user will be provided access.
+`Entities.USER_GROUP_MEMBERSHIP` is an arbitrary Z3 function from strings to bools that is given a concrete value (the set of groups/roles of which the user is a member) when evaluating whether the formula is true or false.
+
+## Constraint Variables
+
+As mentioned above, access control expressions can be constraints over user traits, resource labels, or environmental variables such as the current time.
+These are expressed as follows:
+```py
+
+```
